@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 
 const Instruction = enum(u8) {
     Increment = '+', // VLINC_XXXXXXXXXXXXXXXX
@@ -10,6 +11,19 @@ const Instruction = enum(u8) {
     Output = '.', // OUT_XXXXXXXXXXXXXXXX
     Input = ',', // IN_XXXXXXXXXXXXXXXX
 };
+
+const TranslatedInstruction = std.EnumArray(Instruction, []const u8).init(.{
+    .Increment = "VLINC",
+    .Decrement = "VLDEC",
+    .DataPointerIncrement = "DPINC",
+    .DataPointerDecrement = "DPDEC",
+    .JumpIfZero = "JZ",
+    .JumpIfNotZero = "JNZ",
+    .Output = "OUT",
+    .Input = "IN",
+});
+
+const Token = struct {};
 
 pub fn main() !void {
     const stdout = std.io.getStdOut().writer();
@@ -30,11 +44,13 @@ pub fn main() !void {
     // user inputs Brainfuck code
     try stdin.streamUntilDelimiter(input_buffer.writer(), '\n', 512);
 
-    //const wasd = [_]u8{0};
-    // remove windows \r
-    //try input_buffer.replaceRange(input_buffer.items.len - 1, 1, wasd[0..]);
+    if (builtin.os.tag == .windows) {
+        const wasd = [_]u8{0};
+        // remove windows \r
+        try input_buffer.replaceRange(input_buffer.items.len - 1, 1, wasd[0..]);
 
-    //_ = std.mem.trimRight(u8, input_buffer.items, "\n\r");
+        _ = std.mem.trimRight(u8, input_buffer.items, "\n\r");
+    }
 
     var memory = [_]u8{0} ** 30_000;
 
@@ -47,9 +63,9 @@ pub fn main() !void {
     for (input_buffer.items, 0..) |instruction, index| {
         var foo = try GenerateInstructionSymbol(&input_buffer.items[index], allocator);
 
-        try stdout.print("{s}\n", .{foo});
+        try stdout.print("{c}{s}\n", .{ instruction, foo });
 
-        try InterpretInstruction(@as(Instruction, @enumFromInt(instruction)), &data_pointer, memory.len);
+        //try InterpretInstruction(@as(Instruction, @enumFromInt(instruction)), &data_pointer, memory.len);
     }
 
     try stdout.print("Input: {s}{d}\n", .{ input_buffer.items, @as(i32, data_pointer[0]) });
@@ -61,16 +77,28 @@ fn GenerateInstructionSymbol(instruction: *const u8, allocator: std.mem.Allocato
 
     switch (instruction.*) {
         @intFromEnum(Instruction.Increment) => {
-            try symbol.appendSlice("VLINC_");
+            try symbol.appendSlice(TranslatedInstruction.get(Instruction.Increment));
         },
         @intFromEnum(Instruction.Decrement) => {
-            try symbol.appendSlice("VLDEC_");
+            try symbol.appendSlice(TranslatedInstruction.get(Instruction.Decrement));
         },
         @intFromEnum(Instruction.DataPointerIncrement) => {
-            try symbol.appendSlice("DPDEC_");
+            try symbol.appendSlice(TranslatedInstruction.get(Instruction.DataPointerIncrement));
         },
         @intFromEnum(Instruction.DataPointerDecrement) => {
-            try symbol.appendSlice("DPDEC_");
+            try symbol.appendSlice(TranslatedInstruction.get(Instruction.DataPointerDecrement));
+        },
+        @intFromEnum(Instruction.JumpIfZero) => {
+            try symbol.appendSlice(TranslatedInstruction.get(Instruction.JumpIfZero));
+        },
+        @intFromEnum(Instruction.JumpIfNotZero) => {
+            try symbol.appendSlice(TranslatedInstruction.get(Instruction.JumpIfNotZero));
+        },
+        @intFromEnum(Instruction.Output) => {
+            try symbol.appendSlice(TranslatedInstruction.get(Instruction.Output));
+        },
+        @intFromEnum(Instruction.Input) => {
+            try symbol.appendSlice(TranslatedInstruction.get(Instruction.Input));
         },
         else => {},
     }
